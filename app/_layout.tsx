@@ -1,55 +1,67 @@
 
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import 'react-native-reanimated';
-import { useEffect, useState } from 'react';
+import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts } from 'expo-font';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
 import Onboarding from '../components/Onboarding';
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+const tokenCache = {
+  async getToken(key: string) {
+    try {
+      return SecureStore.getItemAsync(key);
+    } catch (err) {
+      return null;
+    }
+  },
+  async saveToken(key: string, value: string) {
+    try {
+      return SecureStore.setItemAsync(key, value);
+    } catch (err) {
+      return;
+    }
+  },
+};
+
+const InitialLayout = () => {
+  const { isLoaded, isSignedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
   const [isFirstVisit, setIsFirstVisit] = useState(false);
   const [isOnboardingFinished, setIsOnboardingFinished] = useState(false);
 
   useEffect(() => {
     const checkFirstVisit = async () => {
-      try {
-        const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
-        if (hasOnboarded === null) {
-          setIsFirstVisit(true);
-        } else {
-          setIsFirstVisit(false);
-          setIsOnboardingFinished(true); // If not first visit, skip onboarding
-        }
-      } catch (error) {
-        console.error("Failed to access AsyncStorage", error);
-        setIsFirstVisit(false); // Proceed without onboarding on error
-        setIsOnboardingFinished(true);
+      const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+      if (hasOnboarded === null) {
+        setIsFirstVisit(true);
       }
     };
-
     checkFirstVisit();
   }, []);
 
   const handleOnboardingFinish = async () => {
-    try {
-      await AsyncStorage.setItem('hasOnboarded', 'true');
-      setIsOnboardingFinished(true);
-    } catch (error) {
-      console.error("Failed to set AsyncStorage", error);
-      setIsOnboardingFinished(true); // Proceed even if AsyncStorage fails
-    }
+    await AsyncStorage.setItem('hasOnboarded', 'true');
+    setIsOnboardingFinished(true);
   };
 
-  if (!loaded) {
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const inAuthGroup = segments[0] === '(tabs)';
+
+    if (isSignedIn && !inAuthGroup) {
+      router.replace('/(tabs)');
+    } else if (!isSignedIn) {
+      router.replace('/sign-in');
+    }
+  }, [isSignedIn, isLoaded]);
+
+  if (!isLoaded) {
     return null;
   }
 
@@ -58,15 +70,30 @@ export default function RootLayout() {
   }
 
   return (
-    <Animated.View style={{ flex: 1 }} entering={FadeIn.duration(1000)}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </Animated.View>
+    <Stack>
+      <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+      <Stack.Screen name="sign-up" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    </Stack>
   );
-}
+};
+
+const RootLayoutNav = () => {
+  const [loaded] = useFonts({
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+  });
+
+  if (!loaded) {
+    return null;
+  }
+
+  return (
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY!} tokenCache={tokenCache}>
+      <InitialLayout />
+    </ClerkProvider>
+  );
+};
+
+export default RootLayoutNav;
+
 

@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, i
 import OrganizeIcon from './OrganizeIcon';
 import ViewsIcon from './ViewsIcon';
 import WelcomeIcon from './WelcomeIcon';
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -22,7 +23,7 @@ const onboarding_screens = [
   },
   {
     title: 'Welcome',
-    description: 'Let\'s get started!',
+    description: "Let's get started!",
     buttonText: "Let's Go",
     icon: <WelcomeIcon />,
   },
@@ -77,6 +78,7 @@ const Onboarding = ({ onFinish }) => {
       flatListRef.current.scrollToOffset({ offset: (currentIndex + 1) * width });
     } else {
       onFinish();
+      router.push('/sign-in');
     }
   };
 
