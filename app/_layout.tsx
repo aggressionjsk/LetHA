@@ -1,3 +1,4 @@
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -8,7 +9,7 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import SplashScreen from '../components/SplashScreen';
+import Onboarding from '../components/Onboarding';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -16,35 +17,44 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const [isFirstVisit, setIsFirstVisit] = useState(false);
-  const [isSplashFinished, setIsSplashFinished] = useState(false);
+  const [isOnboardingFinished, setIsOnboardingFinished] = useState(false);
 
   useEffect(() => {
     const checkFirstVisit = async () => {
       try {
-        const hasVisited = await AsyncStorage.getItem('hasVisited');
-        if (hasVisited === null) {
+        const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+        if (hasOnboarded === null) {
           setIsFirstVisit(true);
-          await AsyncStorage.setItem('hasVisited', 'true');
         } else {
           setIsFirstVisit(false);
-          setIsSplashFinished(true); // If not first visit, skip splash
+          setIsOnboardingFinished(true); // If not first visit, skip onboarding
         }
       } catch (error) {
         console.error("Failed to access AsyncStorage", error);
-        setIsFirstVisit(false); // Proceed without splash on error
-        setIsSplashFinished(true);
+        setIsFirstVisit(false); // Proceed without onboarding on error
+        setIsOnboardingFinished(true);
       }
     };
 
     checkFirstVisit();
   }, []);
 
+  const handleOnboardingFinish = async () => {
+    try {
+      await AsyncStorage.setItem('hasOnboarded', 'true');
+      setIsOnboardingFinished(true);
+    } catch (error) {
+      console.error("Failed to set AsyncStorage", error);
+      setIsOnboardingFinished(true); // Proceed even if AsyncStorage fails
+    }
+  };
+
   if (!loaded) {
     return null;
   }
 
-  if (isFirstVisit && !isSplashFinished) {
-    return <SplashScreen onFinish={() => setIsSplashFinished(true)} />;
+  if (isFirstVisit && !isOnboardingFinished) {
+    return <Onboarding onFinish={handleOnboardingFinish} />;
   }
 
   return (
@@ -59,3 +69,4 @@ export default function RootLayout() {
     </Animated.View>
   );
 }
+
